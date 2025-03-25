@@ -1,42 +1,42 @@
+from typing import Optional
 from fastapi import FastAPI
+
+from pydantic import BaseModel
+
+class Package(BaseModel):
+    name: str
+    number: str
+    description: Optional[str] = None
 
 app = FastAPI()
 
-employees = [
-    {"id":111,"name":"Ram","place":"USA"},
-    {"id":112,"name":"Krish","place":"UK"},
-    {"id":113,"name":"Shiva","place":"India"},
-    {"id":114,"name":"Shakti","place":"Chennai"},
-    {"id":115,"name":"Steffi","place":"TN"}
-]
+# Pydantic's BaseModel
 
 @app.get('/')
 async def hello_world():
-    return {"Hello": "Study Corner"}
+    return {'Hello' : 'World'}
 
-# Path Parameter
-@app.get("/display/{name}")
-def viewForPath(name:str):
-    for employee in employees:
-        if employee['name'] == name:
-            return employee
+@app.post("/package/{priority}")
+async def make_package(priority: int, package: Package, value: bool):
+    return {"priority": priority, **package.dict(), "value": value}
 
-# Query Parameter
-@app.get("/display")
-def viewForQuery(id:int):
-    for employee in employees:
-        if employee['id'] == id:
-            return employee
-        
-        
-from typing import Optional
 
-# Path Parameter
-@app.get("/component/{component_id}")
-async def get_component(component_id:int):
-    return {"component_id":component_id}
 
-#Query Parameter
-@app.get("/component/")
-async def read_component(component_id:int, text:Optional[str]):
-    return {"component_id":component_id,"text":text}
+
+
+class Item(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+
+
+
+@app.post("/items/")
+async def create_item(item: Item):
+    item_dict = item.dict()
+    if item.tax is not None:
+        price_with_tax = item.price + item.tax
+        item_dict.update({"price_with_tax": price_with_tax})
+    return item_dict
