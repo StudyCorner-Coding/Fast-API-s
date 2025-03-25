@@ -1,1 +1,98 @@
 
+from fastapi import FastAPI, HTTPException
+ from models import Todo, TodoIn_Pydantic, Todo_Pydantic
+ #from tortoise.contrib.fastapi import HTTPNotFoundError, register_tortoise
+ from pydantic import BaseModel
+ 
+ #from fastapi import HTTPException
+ from tortoise.contrib.fastapi import register_tortoise
+ 
+ 
+ class Message(BaseModel):
+     message: str
+ from fastapi import FastAPI
+ 
+ app = FastAPI()
+ 
+ @app.get('/')
+ async def read_root():
+     return {"Hello": "World"}
+ 
+ #create
+ @app.post('/todo', response_model=Todo_Pydantic)
+ async def create(todo: TodoIn_Pydantic):
+     obj = await Todo.create(**todo.dict(exclude_unset=True))
+     return await Todo_Pydantic.from_tortoise_orm(obj)
+ ############################################################
+ 
+ #@app.get('/todo/{id}', response_model=Todo_Pydantic, responses={404: {"model": HTTPNotFoundError}})
+ #async def get_one(id: int):
+  #   return await Todo_Pydantic.from_queryset_single(Todo.get(id=id))
+ employees = [
+     {"id":111,"name":"Ram","place":"USA"},
+     {"id":112,"name":"Krish","place":"UK"},
+     {"id":113,"name":"Shiva","place":"India"},
+     {"id":114,"name":"Shakti","place":"Chennai"},
+     {"id":115,"name":"Steffi","place":"TN"}
+ ]
+ 
+ @app.get("/todo/{id}", response_model=Todo_Pydantic)
+ async def get_todo(id: int):
+     todo = await Todo.get_or_none(id=id)
+     if todo is None:
+         raise HTTPException(status_code=404, detail="Todo not found")
+     return todo
+ 
+ #########################################################
+ 
+ @app.put("/todo/{id}", response_model=Todo_Pydantic)
+ async def update(id: int, todo: TodoIn_Pydantic):
+     todo = await Todo.filter(id=id).update(**todo.dict(exclude_unset=True))
+     if todo is None:
+         raise HTTPException(status_code=404, detail="Todo not found")
+     return await Todo_Pydantic.from_queryset_single(Todo.get(id=id))
+ 
+ @app.delete("/todo/{id}", response_model=Message)
+ async def delete(id: int):
+     delete_obj = await Todo.filter(id=id).delete()
+     if not delete_obj:
+         raise HTTPException(status_code=404, detail="This todo is not found.")
+     return Message(message="Succesfully Deleted")
+ 
+ register_tortoise(
+     app,
+     db_url="sqlite://store.db",
+     modules={'models': ['models']},
+     generate_schemas=True,
+     add_exception_handlers=True,
+ )
+ @app.get('/')
+ async def hello_world():
+     return {"Hello": "Study Corner"}
+ 
+ # Path Parameter
+ @app.get("/display/{name}")
+ def viewForPath(name:str):
+     for employee in employees:
+         if employee['name'] == name:
+             return employee
+ 
+ # Query Parameter
+ @app.get("/display")
+ def viewForQuery(id:int):
+     for employee in employees:
+         if employee['id'] == id:
+             return employee
+         
+         
+ from typing import Optional
+ 
+ # Path Parameter
+ @app.get("/component/{component_id}")
+ async def get_component(component_id:int):
+     return {"component_id":component_id}
+ 
+ #Query Parameter
+ @app.get("/component/")
+ async def read_component(component_id:int, text:Optional[str]):
+     return {"component_id":component_id,"text":text}
