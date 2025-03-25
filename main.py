@@ -1,42 +1,59 @@
-from typing import Optional
-from fastapi import FastAPI
-
+from fastapi import FastAPI, HTTPException
+from models import Todo, TodoIn_Pydantic, Todo_Pydantic
+#from tortoise.contrib.fastapi import HTTPNotFoundError, register_tortoise
 from pydantic import BaseModel
 
-class Package(BaseModel):
-    name: str
-    number: str
-    description: Optional[str] = None
+#from fastapi import HTTPException
+from tortoise.contrib.fastapi import register_tortoise
+
+
+class Message(BaseModel):
+    message: str
 
 app = FastAPI()
 
-# Pydantic's BaseModel
-
 @app.get('/')
-async def hello_world():
-    return {'Hello' : 'World'}
+async def read_root():
+    return {"Hello": "World"}
 
-@app.post("/package/{priority}")
-async def make_package(priority: int, package: Package, value: bool):
-    return {"priority": priority, **package.dict(), "value": value}
+#create
+@app.post('/todo', response_model=Todo_Pydantic)
+async def create(todo: TodoIn_Pydantic):
+    obj = await Todo.create(**todo.dict(exclude_unset=True))
+    return await Todo_Pydantic.from_tortoise_orm(obj)
+############################################################
 
+#@app.get('/todo/{id}', response_model=Todo_Pydantic, responses={404: {"model": HTTPNotFoundError}})
+#async def get_one(id: int):
+ #   return await Todo_Pydantic.from_queryset_single(Todo.get(id=id))
 
+@app.get("/todo/{id}", response_model=Todo_Pydantic)
+async def get_todo(id: int):
+    todo = await Todo.get_or_none(id=id)
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo
 
+#########################################################
 
+@app.put("/todo/{id}", response_model=Todo_Pydantic)
+async def update(id: int, todo: TodoIn_Pydantic):
+    todo = await Todo.filter(id=id).update(**todo.dict(exclude_unset=True))
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return await Todo_Pydantic.from_queryset_single(Todo.get(id=id))
 
-class Item(BaseModel):
-    name: str
-    description: str | None = None
-    price: float
-    tax: float | None = None
+@app.delete("/todo/{id}", response_model=Message)
+async def delete(id: int):
+    delete_obj = await Todo.filter(id=id).delete()
+    if not delete_obj:
+        raise HTTPException(status_code=404, detail="This todo is not found.")
+    return Message(message="Succesfully Deleted")
 
-
-
-
-@app.post("/items/")
-async def create_item(item: Item):
-    item_dict = item.dict()
-    if item.tax is not None:
-        price_with_tax = item.price + item.tax
-        item_dict.update({"price_with_tax": price_with_tax})
-    return item_dict
+register_tortoise(
+    app,
+    db_url="sqlite://store.db",
+    modules={'models': ['models']},
+    generate_schemas=True,
+    add_exception_handlers=True,
+)
